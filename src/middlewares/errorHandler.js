@@ -1,14 +1,26 @@
-import { serverErrorResponse } from "../utils/response.js";
+import { errorResponse } from "../utils/response.js";
 
 export const errorHandler = (err, req, res, _next) => {
-  console.error("ERROR:", err);
+  const isProduction = process.env.NODE_ENV === "production";
 
-  if (err.statusCode && err.message) {
-    return res.status(err.statusCode).json({
-      status: "error",
-      message: err.message,
-    });
+  if (!isProduction) {
+    console.error("ERROR:", err);
+  } else {
+    console.error(`ERROR [${err.statusCode || 500}]: ${err.message}`);
   }
 
-  return serverErrorResponse(res);
+  if (err.name === "TokenExpiredError") {
+    return errorResponse(res, "Token sudah expired", 401);
+  }
+
+  if (err.name === "JsonWebTokenError") {
+    return errorResponse(res, "Token tidak valid", 401);
+  }
+
+  if (err.statusCode && err.message) {
+    return errorResponse(res, err.message, err.statusCode);
+  }
+
+  const message = isProduction ? "Terjadi kesalahan server" : err.message;
+  return errorResponse(res, message, 500);
 };

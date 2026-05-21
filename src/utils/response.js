@@ -12,10 +12,3 @@ export const errorResponse = (res, message = "failed", code = 400) => {
     message,
   });
 };
-
-export const serverErrorResponse = ( res, message = "Terjadi kesalahan server", code = 500) => {
-  return res.status(code).json({
-    status: "error",
-    message,
-  });
-};
