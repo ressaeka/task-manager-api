@@ -19,45 +19,35 @@ export const registerLimiter = rateLimit ({
     max : 5, 
     message : {
         status: 'fail',
-        message: 'Terlalu banyak percobaan Register, Coba lagi setalah 1 jam.'
+        message: 'Terlalu banyak percobaan Register, Coba lagi setelah 1 jam.'
     },
     standardHeaders :true,
     legacyHeaders: false
 })
 
-// Limiter untuk api umum (100x dalam 1 menit)
+// Limiter untuk api umum (500x dalam 1 menit - safety net aja)
 export const apiLimiter = rateLimit({
     windowMs : 60 * 1000,
-    max: 100,
+    max: 500,
     message: {
         status: 'fail',
-        message: 'Terlalu banyak request, Coba lagi setalah 1 menit.'
+        message: 'Terlalu banyak request, Coba lagi setelah 1 menit.'
     },
     standardHeaders :true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    skip: (req) => req.method === 'OPTIONS'
 })
 
-// limiter untuk api admin(200x dalam 1 menit)
+// limiter untuk api admin(300x dalam 1 menit)
 export const adminLimiter  = rateLimit ({
     windowMs : 60 * 1000,
-    max : 200,
+    max : 300,
     message : {
         status:'fail',
         message:'Terlalu banyak request, Coba lagi setelah 1 menit.'
     },
     standardHeaders: true,
-    legacyHeaders: false
-
+    legacyHeaders: false,
+    skip: (req) => req.method === 'OPTIONS'
 })
 
-// // Limiter untuk super ketat
-// export const strictLimiter = rateLimit ({
-//     windowMs : 60 * 100,
-//     max : 10,
-//     message: {
-//         status:'failed',
-//         message:'Terlaly banyak request. Coba lagi setelah 1 menit.'
-//     },
-//     standardHeaders:true,
-//     legancyHeaders:false
-// })

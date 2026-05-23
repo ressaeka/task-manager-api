@@ -35,7 +35,7 @@ export const getTaskByUserId = async (userId) => {
 // - Filter by status (pending, in-progress, done)
 // - Search by title (ILIKE)
 // Hanya task yang belum di-soft delete (deleted_at IS NULL)
-export const getTaskByUserIdPaginated = async (userId, limit, offset, status = null, search = null, sort = 'createad_at', order = 'decs') => {
+export const getTaskByUserIdPaginated = async (userId, limit, offset, status = null, search = null, sort = 'created_at', order = 'desc') => {
   let query = `
     SELECT id, public_id, title, description, status, deadline_at, created_at, updated_at
     FROM task
@@ -101,7 +101,7 @@ export const countTaskByUserId = async (userId, status=null, search = null) => {
 // Digunakan untuk operasi update, delete, soft delete, restore
 export const findTaskById = async (taskId, userId) => {
   const result = await pool.query(
-    `SELECT id, public_id, title, description, deadline_at, status, created_at, updated_at, deleted_at , deleted_expires_at
+    `SELECT id, public_id, title, description, deadline_at, status, created_at, updated_at, deleted_at, deleted_expires_at
      FROM task
      WHERE id = $1 AND user_id = $2`,
     [taskId, userId],
@@ -148,15 +148,15 @@ export const deleteTaskById = async (taskId, userId) => {
 
 // SOFT DELETE TASK (individual)
 // Menandai task sebagai "dihapus" tanpa menghapus data
-// Set deleted_at = NOW() dan expires_at = NOW() + 30 days
+// Set deleted_at = NOW() dan deleted_expires_at = NOW() + 30 days
 // Task bisa direstore dalam 30 hari
 export const softDeleteTaskById = async (taskId, userId) => {
   const result = await pool.query(
     `UPDATE task SET 
-      deleted_at = NOW(),
-      expires_at = NOW() + INTERVAL '30 days'
+       deleted_at = NOW(),
+       deleted_expires_at = NOW() + INTERVAL '30 days'
      WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-     RETURNING id, public_id, title, description, deadline_at, status, user_id, created_at, updated_at, deleted_at, expires_at`,
+     RETURNING id, public_id, title, description, deadline_at, status, user_id, created_at, updated_at, deleted_at, deleted_expires_at`,
     [taskId, userId]
   );
   return result.rows[0] ?? null;
@@ -164,31 +164,41 @@ export const softDeleteTaskById = async (taskId, userId) => {
 
 // RESTORE TASK (individual)
 // Mengembalikan task yang sudah di-soft delete
-// Set deleted_at = NULL dan expires_at = NULL
+// Set deleted_at = NULL dan deleted_expires_at = NULL
 export const restoreTaskById = async (taskId, userId) => {
   const result = await pool.query(
     `UPDATE task SET 
-      deleted_at = NULL,
-      expires_at = NULL
+       deleted_at = NULL,
+       deleted_expires_at = NULL
      WHERE id = $1 AND user_id = $2
-     RETURNING id, public_id, title, description, status, deadline_at, user_id, created_at, updated_at, deleted_at, expires_at`,
+     RETURNING id, public_id, title, description, status, deadline_at, user_id, created_at, updated_at, deleted_at, deleted_expires_at`,
     [taskId, userId]
   );
   return result.rows[0] ?? null;
 };
 
-// GET DELETED TASK (tong sampah user)
+// GET DELETED TASK (tong sampah user) WITH PAGINATION
 // Mengambil semua task milik user yang sudah di-soft delete
 // Urut dari yang paling baru dihapus (deleted_at DESC)
-export const getDeleteTaskByUserId = async (userId) => {
+export const getDeleteTaskByUserId = async (userId, limit, offset) => {
   const result = await pool.query(
-    `SELECT id, public_id, title, description, deadline_at, status, user_id, created_at, updated_at, deleted_at, expires_at
+    `SELECT id, public_id, title, description, deadline_at, status, user_id, created_at, updated_at, deleted_at, deleted_expires_at
      FROM task
      WHERE user_id = $1 AND deleted_at IS NOT NULL
-     ORDER BY deleted_at DESC`,
-    [userId]
+     ORDER BY deleted_at DESC
+     LIMIT $2 OFFSET $3`,
+    [userId, limit, offset]
   );
   return result.rows;
+};
+
+// COUNT DELETED TASK BY USER
+export const countDeleteTaskByUserId = async (userId) => {
+  const result = await pool.query(
+    `SELECT COUNT(*) FROM task WHERE user_id = $1 AND deleted_at IS NOT NULL`,
+    [userId]
+  );
+  return parseInt(result.rows[0].count);
 };
 
 // SET DEADLINE TASK

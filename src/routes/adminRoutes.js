@@ -8,7 +8,8 @@ import {
   getUserByUsername,
   getDashboardStats,
   softDeleteUser,
-  restoreUser
+  restoreUser,
+  getTaskByPublicId,
 } from "../controllers/adminController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { adminMiddleware } from "../middlewares/adminMiddleware.js";
@@ -33,6 +34,7 @@ router.get("/users", getAllUsers);                           // all users
 
 // TASK ROUTES
 router.get("/task", getAllTask);
+router.get("/task/:publicId", getTaskByPublicId);
 
 // ADMIN DASHBOARD STATS
 router.get("/dashboard", getDashboardStats);

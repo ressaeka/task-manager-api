@@ -1,8 +1,8 @@
 import express from "express";
 import {
   createTask,
-  getTask,
-  getTaskById,      
+  getTasks,
+  getTaskById,
   updateTask,
   softDeleteTask,
   restoreTask,
@@ -11,27 +11,21 @@ import {
   setDeadlineTask,
   getTaskByDeadline,
   getTaskDeadlineToday
-
 } from "../controllers/taskController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// TASK
-router.post("/task", authMiddleware, createTask);
-router.get("/task", authMiddleware, getTask);
-router.get("/:id", authMiddleware, getTaskById);  
+router.post("/", authMiddleware, createTask);
+router.get("/", authMiddleware, getTasks);
+router.get("/deleted", authMiddleware, getDeletedTask);
+router.put("/:id/deadline", authMiddleware, setDeadlineTask);
+router.get("/deadline/upcoming", authMiddleware, getTaskByDeadline);
+router.get("/deadline/today", authMiddleware, getTaskDeadlineToday);
+router.get("/:id", authMiddleware, getTaskById);
 router.put("/:id", authMiddleware, updateTask);
 router.delete("/:id", authMiddleware, deleteTask);
-
-// SOFT DELETE & RESTORE TASK (UNTUK USER)
 router.delete("/:id/soft", authMiddleware, softDeleteTask);
 router.post("/:id/restore", authMiddleware, restoreTask);
-router.get("/deleted", authMiddleware, getDeletedTask);
-
-// Deadline
-router.put("/task/:id/deadline", authMiddleware, setDeadlineTask);
-router.get("/task/deadline/upcoming", authMiddleware, getTaskByDeadline);
-router.get("/task/deadline/today", authMiddleware, getTaskDeadlineToday);
 
 export default router;

@@ -1,7 +1,7 @@
-import { 
+import {
   findAllTaskPaginated,
-  findAllUsersPaginated, 
-  countTotalUsers, 
+  findAllUsersPaginated,
+  countTotalUsers,
   countTotalTask,
   deleteUserById,
   countPendingTask,
@@ -10,31 +10,29 @@ import {
   countNewUsersLast7Days,
   countActiveUsersToday,
   softDeleteUserById,
-  restoreUserById
+  restoreUserById,
+  findTaskByPublicId
 } from "../models/adminModel.js";
 import { 
   findUserById as findUserByIdModel, 
   findUserByUsername as findUserByUsernameModel,  
   createUser 
 } from "../models/usersModel.js";
-import bcrypt from "bcrypt";
-import { customAlphabet } from "nanoid";
+import { hashPassword, generatePublicId } from "../utils/userHelpers.js";
+import { AppError } from "../utils/AppError.js";
 
 // CREATE ADMIN 
 export const createAdminService = async (userData) => {
   const existingAdmin = await findUserByUsernameModel(userData.username);
   
   if (existingAdmin) {
-    throw new Error("Admin sudah terdaftar");
+    throw new AppError("Admin sudah terdaftar", 409);
   }
 
-  const hashedPassword = await bcrypt.hash(userData.password, 10);
-  const nanoid = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 10);
-
   const newAdmin = await createUser({
-    publicId: nanoid(),
+    publicId: generatePublicId(),
     username: userData.username,
-    password: hashedPassword,
+    password: await hashPassword(userData.password),
     role: "admin",
   });
   
@@ -42,47 +40,28 @@ export const createAdminService = async (userData) => {
 };
 
 // GET ALL USERS WITH PAGINATION
-export const getAllUsersService = async (page = 1, limit = 10, role = null, public_id=null) => {
+export const getAllUsersService = async (page = 1, limit = 10, role = null, public_id = null, search = null) => {
   const offset = (page - 1) * limit;
 
-  const users = await findAllUsersPaginated(limit, offset, role, public_id);
-  const total = await countTotalUsers(role);  
+  const users = await findAllUsersPaginated(limit, offset, role, public_id, search);
+  const total = await countTotalUsers(role, public_id, search);
+
+  if (public_id && users.length === 0) {
+    throw new AppError(`User dengan public_id : ${public_id} tidak ditemukan`, 404);
+  }
 
   return {
-    users, 
+    users,
     pagination: {
       page,
       limit,
       total,
       totalPages: Math.ceil(total / limit),
-      ...(role     &&   { filter    :   {  role      }}),
-      ...(public_id &&   { filter   :   {  public_id  }})
-
-
+      ...(role      && { filter: { role } }),
+      ...(search    && { filter: { search } }),
+      ...(public_id && { filter: { public_id } }),
     }
   };
-};
-
-// FIND USER BY USERNAME
-export const findUserByUsername = async (username) => {
-  const user = await findUserByUsernameModel(username);
-
-  if (!user) {
-    throw new Error("User tidak ditemukan");  
-  }
-
-  return user;
-};
-
-// FIND USER BY ID 
-export const findUserById = async (userId) => {
-  const user = await findUserByIdModel(userId);
-
-  if (!user) {
-    throw new Error("User tidak ditemukan");
-  }
-
-  return user;
 };
 
 // GET TASK WITH PAGINATION
@@ -149,44 +128,64 @@ export const getDashboardStatsService = async () => {
   };
 };
 
+// GET USER BY USERNAME
+export const getUserByUsernameService = async (username) => {
+  const user = await findUserByUsernameModel(username);
+  if (!user) {
+    throw new AppError("User tidak ditemukan", 404);
+  }
+  return user;
+};
+
+// GET USER BY ID
+export const getUserByIdService = async (userId) => {
+  const user = await findUserByIdModel(userId);
+  if (!user) {
+    throw new AppError("User tidak ditemukan", 404);
+  }
+  return user;
+};
+
 // DELETE USER
 export const deleteUserService = async (userId) => {
   const user = await findUserByIdModel(userId);
-
   if (!user) {
-    throw new Error("User tidak ditemukan");
+    throw new AppError("User tidak ditemukan", 404);
   }
-
   return await deleteUserById(userId);
 };
 
-// SOFT DELETE USER 
+// SOFT DELETE USER
 export const softDeleteUserService = async (userId) => {
   const user = await findUserByIdModel(userId);
-
-  if(!user){
-    throw new Error("User tidak di temukan")
+  if (!user) {
+    throw new AppError("User tidak ditemukan", 404);
   }
-
-  if(user.deleted_at){
-    throw new Error("User sudah di hapus")
+  if (user.deleted_at) {
+    throw new AppError("User sudah dihapus", 400);
   }
-
-  return await softDeleteUserById(userId)
+  return await softDeleteUserById(userId);
 };
 
-// RESTORE USER 
+// RESTORE USER
 export const restoreUserService = async (userId) => {
-  const user = await findUserByIdModel(userId)
-
-  if(!user){
-    throw new Error("User tidak di temukan")
+  const user = await findUserByIdModel(userId);
+  if (!user) {
+    throw new AppError("User tidak ditemukan", 404);
   }
-
-  if(!user.deleted_at){
-    throw new Error("User masih aktif, tidak perlu di restore")
+  if (!user.deleted_at) {
+    throw new AppError("User masih aktif, tidak perlu di restore", 400);
   }
-
-  return await restoreUserById(userId)
+  return await restoreUserById(userId);
 };
+
+// GET TASK BY PUBLIC_ID
+export const getTaskByPublicIdService = async (publicId) => {
+  const task = await findTaskByPublicId(publicId);
+  if (!task) {
+    throw new AppError("Task tidak ditemukan", 404);
+  }
+  return task;
+};
+
 

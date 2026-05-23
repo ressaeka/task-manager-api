@@ -1,5 +1,6 @@
 /* eslint-disable no-useless-assignment */
 import pool from "../config/db.js";
+import { generatePublicId } from "../utils/userHelpers.js";
 
 // 
 // 1. CREATE ADMIN
@@ -9,21 +10,22 @@ import pool from "../config/db.js";
 export const createAdmin = async ({ username, password }) => {
   const result = await pool.query(
     `INSERT INTO users (public_id, username, password, role)
-      VALUES (gen_random_uuid(), $1, $2, 'admin')
+      VALUES ($1, $2, $3, 'admin')
       RETURNING id, public_id, username, role, created_at`,
-    [username, password]
+    [generatePublicId(), username, password]
   );
   return result.rows[0];
 };
 
 // 2. USERS - GET ALL USERS WITH PAGINATION + FILTER
 // Mengambil semua user (kecuali yang di soft delete)
-// Support: pagination (limit, offset), filter role, filter public_id
-export const findAllUsersPaginated = async (limit, offset, role = null, public_id = null) => {
+// Support: pagination (limit, offset), filter role, filter public_id, search by username
+export const findAllUsersPaginated = async (limit, offset, role = null, public_id = null, search = null) => {
   let query = `
-    SELECT id, public_id, username, role, created_at
-    FROM users
-    WHERE deleted_at IS NULL
+    SELECT u.id, u.public_id, u.username, u.role, u.created_at,
+           (SELECT COUNT(*) FROM task t WHERE t.user_id = u.id AND t.deleted_at IS NULL) AS task_count
+    FROM users u
+    WHERE u.deleted_at IS NULL
   `;
   const values = [];
   let paramCount = 1;
@@ -32,6 +34,12 @@ export const findAllUsersPaginated = async (limit, offset, role = null, public_i
   if (role) {
     query += ` AND role = $${paramCount++}`;
     values.push(role);
+  }
+
+  // Filter by username (search)
+  if (search) {
+    query += ` AND username ILIKE $${paramCount++}`;
+    values.push(`%${search}%`);
   }
 
   // Filter by public_id (exact match)
@@ -51,7 +59,7 @@ export const findAllUsersPaginated = async (limit, offset, role = null, public_i
 // 3. USERS - COUNT TOTAL USERS WITH FILTER
 // Menghitung total user (kecuali yang soft delete)
 // Support: filter role, filter public_id
-export const countTotalUsers = async (role = null, public_id = null) => {
+export const countTotalUsers = async (role = null, public_id = null, search = null) => {
   let query = `SELECT COUNT(*) FROM users WHERE deleted_at IS NULL`;
   const values = [];
   let paramCount = 1;
@@ -59,6 +67,11 @@ export const countTotalUsers = async (role = null, public_id = null) => {
   if (role) {
     query += ` AND role = $${paramCount++}`;
     values.push(role);
+  }
+
+  if (search) {
+    query += ` AND username ILIKE $${paramCount++}`;
+    values.push(`%${search}%`);
   }
 
   if (public_id) {
@@ -115,7 +128,7 @@ export const findAllTaskPaginated = async (limit, offset, status = null, search 
 // Menghitung total task (kecuali yang soft delete)
 // Support: filter status, search by title
 export const countTotalTask = async (status = null, search = null) => {
-  let query = `SELECT COUNT(*) FROM task WHERE 1=1`;
+  let query = `SELECT COUNT(*) FROM task WHERE deleted_at IS NULL`;
   const values = [];
   let paramCount = 1;
 
@@ -133,6 +146,19 @@ export const countTotalTask = async (status = null, search = null) => {
   return parseInt(result.rows[0].count);
 };
 
+// 5. TASKS - FIND TASK BY PUBLIC_ID (admin)
+export const findTaskByPublicId = async (publicId) => {
+  const result = await pool.query(
+    `SELECT t.id, t.public_id, t.title, t.description, t.status,
+            t.deadline_at, t.user_id, t.created_at, t.updated_at, u.username
+     FROM task t
+     JOIN users u ON u.id = t.user_id
+     WHERE t.public_id = $1 AND t.deleted_at IS NULL`,
+    [publicId]
+  );
+  return result.rows[0] ?? null;
+};
+
 // 6. DASHBOARD STATS
 // Menghitung berbagai metric untuk admin dashboard
 // countPendingTask   : jumlah task dengan status pending
@@ -142,21 +168,21 @@ export const countTotalTask = async (status = null, search = null) => {
 // countActiveUsersToday: user yang membuat task hari ini
 export const countPendingTask = async () => {
   const result = await pool.query(
-    `SELECT COUNT(*) FROM task WHERE status = 'pending'`
+    `SELECT COUNT(*) FROM task WHERE status = 'pending' AND deleted_at IS NULL`
   );
   return parseInt(result.rows[0].count);
 };
 
 export const countInProgressTask = async () => {
   const result = await pool.query(
-    `SELECT COUNT(*) FROM task WHERE status = 'in-progress'`
+    `SELECT COUNT(*) FROM task WHERE status = 'in-progress' AND deleted_at IS NULL`
   );
   return parseInt(result.rows[0].count);
 };
 
 export const countCompletedTask = async () => {
   const result = await pool.query(
-    `SELECT COUNT(*) FROM task WHERE status = 'done'`
+    `SELECT COUNT(*) FROM task WHERE status = 'done' AND deleted_at IS NULL`
   );
   return parseInt(result.rows[0].count);
 };
@@ -164,7 +190,7 @@ export const countCompletedTask = async () => {
 export const countNewUsersLast7Days = async () => {
   const result = await pool.query(
     `SELECT COUNT(*) FROM users
-     WHERE created_at >= NOW() - INTERVAL '7 days'`
+     WHERE created_at >= NOW() - INTERVAL '7 days' AND deleted_at IS NULL`
   );
   return parseInt(result.rows[0].count);
 };
@@ -172,7 +198,7 @@ export const countNewUsersLast7Days = async () => {
 export const countActiveUsersToday = async () => {
   const result = await pool.query(
     `SELECT COUNT(DISTINCT user_id) FROM task
-     WHERE created_at >= CURRENT_DATE`
+     WHERE created_at >= CURRENT_DATE AND deleted_at IS NULL`
   );
   return parseInt(result.rows[0].count);
 };
@@ -192,36 +218,37 @@ export const deleteUserById = async (userId) => {
 
 // 8. SOFT DELETE USER + TASKS
 // Menandai user dan semua task-nya sebagai "dihapus" tanpa menghapus data
-// Soft delete: set deleted_at = NOW() dan expires_at = NOW() + 30 days
+// Soft delete: set deleted_at = NOW() dan deleted_expires_at = NOW() + 30 days (task)
+// Soft delete: set deleted_at = NOW() dan expires_at = NOW() + 30 days (users)
 // Menggunakan TRANSACTION agar user dan task terhapus bersamaan
 export const softDeleteUserById = async (userId) => {
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN'); // Mulai transaksi
-    
-    // Soft delete task user (set deleted_at dan expires_at)
+
+    // Soft delete task user (set deleted_at dan deleted_expires_at)
     await client.query(
-      `UPDATE task SET 
-        deleted_at = NOW(),
-        expires_at = NOW() + INTERVAL '30 days'
-       WHERE user_id = $1 AND deleted_at IS NULL`,
+      `UPDATE task SET
+         deleted_at = NOW(),
+         deleted_expires_at = NOW() + INTERVAL '30 days'
+        WHERE user_id = $1 AND deleted_at IS NULL`,
       [userId]
     );
-    
+
     // Soft delete user (set deleted_at dan expires_at)
     const result = await client.query(
-      `UPDATE users SET 
-        deleted_at = NOW(),
-        expires_at = NOW() + INTERVAL '30 days'
-       WHERE id = $1 AND deleted_at IS NULL
-       RETURNING id, public_id, username, role, deleted_at, expires_at`,
+      `UPDATE users SET
+         deleted_at = NOW(),
+         expires_at = NOW() + INTERVAL '30 days'
+        WHERE id = $1 AND deleted_at IS NULL
+        RETURNING id, public_id, username, role, deleted_at, expires_at`,
       [userId]
     );
-    
+
     await client.query('COMMIT'); // Simpan perubahan
     return result.rows[0] ?? null;
-    
+
   } catch (error) {
     await client.query('ROLLBACK'); // Batalkan jika error
     throw error;
@@ -232,36 +259,37 @@ export const softDeleteUserById = async (userId) => {
 
 // 9. RESTORE USER + TASKS
 // Mengembalikan user dan task yang sudah di soft delete
-// Restore: set deleted_at = NULL dan expires_at = NULL
+// Restore: set deleted_at = NULL dan deleted_expires_at = NULL (task)
+// Restore: set deleted_at = NULL dan expires_at = NULL (users)
 // Menggunakan TRANSACTION agar user dan task ter-restore bersamaan
 export const restoreUserById = async (userId) => {
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN'); // Mulai transaksi
-    
+
     // Restore task user (hapus tanda deleted)
     await client.query(
-      `UPDATE task SET 
-        deleted_at = NULL,
-        expires_at = NULL
-       WHERE user_id = $1 AND deleted_at IS NOT NULL`,
+      `UPDATE task SET
+         deleted_at = NULL,
+         deleted_expires_at = NULL
+        WHERE user_id = $1 AND deleted_at IS NOT NULL`,
       [userId]
     );
-    
+
     // Restore user (hapus tanda deleted)
     const result = await client.query(
-      `UPDATE users SET 
-        deleted_at = NULL,
-        expires_at = NULL
-       WHERE id = $1
-       RETURNING id, public_id, username, role`,
+      `UPDATE users SET
+         deleted_at = NULL,
+         expires_at = NULL
+        WHERE id = $1
+        RETURNING id, public_id, username, role`,
       [userId]
     );
-    
+
     await client.query('COMMIT'); // Simpan perubahan
     return result.rows[0] ?? null;
-    
+
   } catch (error) {
     await client.query('ROLLBACK'); // Batalkan jika error
     throw error;

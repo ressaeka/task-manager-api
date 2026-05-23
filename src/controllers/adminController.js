@@ -5,207 +5,142 @@ import {
   getDashboardStatsService,
   deleteUserService,
   softDeleteUserService,
-  restoreUserService
+  restoreUserService,
+  getUserByUsernameService,
+  getUserByIdService,
+  getTaskByPublicIdService,
 } from "../services/adminServices.js";
 
-import { findUserById, findUserByUsername } from "../models/usersModel.js"; 
-
-import {
-  successResponse,
-  errorResponse,
-  serverErrorResponse,
-} from "../utils/response.js";
-
-import { validateAdmin } from "../validators/index.js";
+import { successResponse } from "../utils/response.js";
+import { validateAdmin } from "../validators/authValidator.js";
+import { validatePagination, validateRole, validateTaskQuery } from "../validators/queryValidator.js";
+import { parseId } from "../utils/parseId.js";
 
 // CREATE ADMIN
-export const createAdmin = async (req, res) => {
+export const createAdmin = async (req, res, next) => {
   try {
-    const { username, password } = req.body;
-    validateAdmin(req.body); 
-    await createAdminService({ username, password }); 
-    return successResponse(res, "Admin berhasil dibuat", 201);
+    validateAdmin(req.body);
+    await createAdminService(req.body);
+    return successResponse(res, null, "Admin berhasil dibuat", 201);
   } catch (err) {
-    return errorResponse(res, err.message, 400);
+    return next(err);
   }
 };
 
-// GET USERS BY USERNAME
-export const getUserByUsername = async (req, res) => {
+// GET USER BY USERNAME
+export const getUserByUsername = async (req, res, next) => {
   try {
-    const { username } = req.params;
-
-    if(!username || username.trim() === "" ){
-      return errorResponse(res, "Username tidak boleh kosong", 400)
-    }
-
-    const user = await findUserByUsername(username)
-
-    return successResponse(res, { user }, "Berhasil mengambil user", 200)
-  } catch(err){
-    if(err.message === "User tidak ditemukan"){
-        return errorResponse(res, err.message, 404);
-    }
-    return serverErrorResponse(res, err.message, 500)
+    const user = await getUserByUsernameService(req.params.username);
+    return successResponse(res, { user }, "Berhasil mengambil user", 200);
+  } catch (err) {
+    return next(err);
   }
-}
+};
 
 // GET USER BY ID
-export const getUserById = async (req, res) => {
+export const getUserById = async (req, res, next) => {
   try {
-    const userId = Number(req.params.id);
-
-    if (isNaN(userId) || userId <= 0) {
-      return errorResponse(res, "ID user tidak valid", 400);
-    }
-
-    const user = await findUserById(userId); 
-
-    if (!user) {
-      return errorResponse(res, "User tidak ditemukan", 404);
-    }
-
+    const user = await getUserByIdService(parseId(req.params.id));
     return successResponse(res, { user }, "Berhasil mengambil user", 200);
-  } catch(err) {
-    return serverErrorResponse(res, err.message, 500);
+  } catch (err) {
+    return next(err);
   }
 };
 
-// GET ALL USERS 
-export const getAllUsers = async (req, res) => {
+// GET ALL USERS
+export const getAllUsers = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const role = req.query.role;
-    const public_id = req.query.public_id;
-    
-    if (page < 1) {
-      return errorResponse(res, "Page minimal 1", 400);
-    }
-    if (limit < 1 || limit > 100) {
-      return errorResponse(res, "Limit minimal 1 dan maksimal 100", 400);
-    }
-    if (role && !['user', 'admin'].includes(role)) {
-      return errorResponse(res, "Role harus 'user' atau 'admin'", 400);
-    }
-    
+    const { role, public_id, search } = req.query;
+
+    validatePagination({ page, limit });
+    validateRole(role);
+
+    const result = await getAllUsersService(page, limit, role, public_id, search);
+
     let message = "Berhasil mengambil semua user";
-    
-    if(public_id){
-      message = `Berhasil mengambil user dengan public_id : ${public_id}`
+    if (public_id) {
+      message = `Berhasil mengambil user dengan public_id : ${public_id}`;
     }
-    else if(role){
-      message = `Berhasil mengambil user dengan role: ${role}`
+    else if (role) {
+      message = `Berhasil mengambil user dengan role: ${role}`;
     }
-    
-    const result = await getAllUsersService(page, limit, role, public_id);
-    
-    if (public_id && result.users.length === 0) {
-      return errorResponse(res, `User dengan public_id : ${public_id} tidak ditemukan`, 404);
+    else if (search) {
+      message = `Berhasil mencari user dengan kata kunci: ${search}`;
     }
+
     return successResponse(res, result, message, 200);
   } catch (err) {
-    return serverErrorResponse(res, err.message, 500);
+    return next(err);
   }
 };
 
-// GET TASK
-export const getAllTask = async (req, res) => {
+// GET ALL TASKS
+export const getAllTask = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const status = req.query.status;
-    const search = req.query.search;
-    const sort = req.query.sort || 'created_at';
-    const order = req.query.order || 'desc';
+    const { status, search, sort = "created_at", order = "desc" } = req.query;
 
-    if(page < 1) {
-      return errorResponse(res, "Page minimal 1", 400);
-    }
-
-    if(limit < 1 || limit > 100){
-      return errorResponse(res, "Limit minimal 1 dan maksimal 100", 400);
-    }
-    if(status && !['pending', 'in-progress', 'done'].includes(status)){
-      return errorResponse(res, "Status harus pending, in-progress, atau done", 400);
-    }
-
-    //validasi sort
-    const allowedSortColumns = ['created_at', 'title', 'status', 'deadline_at', 'updated_at'];
-
-    if(!allowedSortColumns.includes(sort)){
-      return errorResponse(res, `Sort harus salah satu dari: ${allowedSortColumns.join(', ')}`, 400);
-    }
-
-    if(order && !['asc', 'desc'].includes(order)){
-      return errorResponse(res, "Order harus 'asc' atau 'desc'", 400);
-    }
+    validatePagination({ page, limit });
+    validateTaskQuery({ status, sort, order });
 
     const result = await getAllTaskService(page, limit, status, search, sort, order);
-
     return successResponse(res, result, "Berhasil mengambil semua task", 200);
   } catch (err) {
-    return serverErrorResponse(res, err.message, 500);
+    return next(err);
   }
 };
 
+// GET TASK BY PUBLIC_ID
+export const getTaskByPublicId = async (req, res, next) => {
+  try {
+    const task = await getTaskByPublicIdService(req.params.publicId);
+    return successResponse(res, { task }, "Berhasil mengambil task", 200);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+
+
 // GET DASHBOARD STATS
-export const getDashboardStats = async (req, res) => {
+export const getDashboardStats = async (req, res, next) => {
   try {
     const stats = await getDashboardStatsService();
-    
     return successResponse(res, { stats }, "Berhasil mengambil dashboard stats", 200);
   } catch (err) {
-    return serverErrorResponse(res, err.message, 500);
+    return next(err);
   }
 };
 
 // DELETE USER
-export const deleteUser = async (req, res) => {
+export const deleteUser = async (req, res, next) => {
   try {
-    const userId = Number(req.params.id);
-
-    if (isNaN(userId) || userId <= 0) {
-      return errorResponse(res, "ID user tidak valid", 400);
-    }
-
-    await deleteUserService(userId);
+    await deleteUserService(parseId(req.params.id));
     return successResponse(res, null, "User berhasil dihapus", 200);
   } catch (err) {
-    return errorResponse(res, err.message, 400);
+    return next(err);
   }
 };
 
 // SOFT DELETE USER
-export const softDeleteUser = async (req, res) => {
+export const softDeleteUser = async (req, res, next) => {
   try {
-    const userId = Number(req.params.id)
-
-    if(isNaN(userId) || userId <= 0) {
-      return errorResponse(res, "ID user tidak valid", 400);
-    }
-    
-    await softDeleteUserService(userId)  
-    return successResponse(res, null, "User berhasil dihapus (soft delete)", 200)
-    
+    await softDeleteUserService(parseId(req.params.id));
+    return successResponse(res, null, "User berhasil dihapus (soft delete)", 200);
   } catch (err) {
-    return errorResponse(res, err.message, 400)
+    return next(err);
   }
 };
 
 // RESTORE USER
-export const restoreUser = async (req, res) => {
+export const restoreUser = async (req, res, next) => {
   try {
-    const userId = Number(req.params.id);
-
-    if(isNaN(userId) || userId <= 0){
-      return errorResponse(res, "ID user tidak valid", 400);
-    }
-
-    await restoreUserService(userId);  
-    return successResponse(res, null, "User berhasil di restore", 200)
-    
-  } catch (err){
-    return errorResponse(res, err.message, 400)
+    await restoreUserService(parseId(req.params.id));
+    return successResponse(res, null, "User berhasil di restore", 200);
+  } catch (err) {
+    return next(err);
   }
 };

@@ -39,3 +39,41 @@ export const findUserById = async (id) => {
   );
   return result.rows[0] ?? null;
 };
+
+export const updatePassword = async (userId, newPassword) => {
+  const result = await pool.query(
+    `UPDATE users SET password = $1 WHERE id = $2
+     RETURNING id, public_id, username, role, created_at`,
+    [newPassword, userId]
+  );
+  return result.rows[0] ?? null;
+};
+
+export const softDeleteOwnAccount = async (userId) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE task SET
+         deleted_at = NOW(),
+         deleted_expires_at = NOW() + INTERVAL '30 days'
+       WHERE user_id = $1 AND deleted_at IS NULL`,
+      [userId]
+    );
+    const result = await client.query(
+      `UPDATE users SET
+         deleted_at = NOW(),
+         expires_at = NOW() + INTERVAL '30 days'
+       WHERE id = $1 AND deleted_at IS NULL
+       RETURNING id, public_id, username, role, deleted_at, expires_at`,
+      [userId]
+    );
+    await client.query('COMMIT');
+    return result.rows[0] ?? null;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
