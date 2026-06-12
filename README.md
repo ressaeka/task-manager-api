@@ -71,9 +71,6 @@ Aplikasi ini dikembangkan sebagai **proyek pembelajaran dan portofolio** untuk m
 | **Skalabilitas** | Belum ada caching / load balancing — performa turun jika banyak user | Rencana: Redis caching + query optimization |
 | **Mobile** | Belum ada mobile app / PWA — hanya via browser | Rencana: PWA atau React Native |
 | **Dokumentasi**| Developer lain kesulitan mempelajari API tanpa dokumentasi interaktif | Prioritas 5: Swagger/OpenAPI |
-
-> ℹ️  Detail prioritas pengembangan ada di [`dokumentasi.md`](./dokumentasi.md).
-
 ---
 
 ## Fitur Lengkap
