@@ -29,6 +29,19 @@ Aplikasi ini dikembangkan sebagai **proyek pembelajaran dan portofolio** untuk m
 
 ---
 
+## Dampak untuk Masyarakat
+
+| Dampak | Positif | Negatif |
+|--------|---------|---------|
+| **Produktivitas** | Membantu individu & tim mengelola task secara terstruktur, meningkatkan efisiensi kerja | Ketergantungan pada aplikasi bisa mengurangi kemampuan mengingat & mengatur secara mandiri |
+| **Edukasi & Portofolio** | Menjadi referensi belajar open-source bagi developer yang ingin mempelajari arsitektur MVC, Express, PostgreSQL, dan testing | Dokumentasi & code comments masih minim, menyulitkan pemula yang baru belajar |
+| **Aksesibilitas** | Gratis dan open-source — siapa saja bisa menginstall, memodifikasi, dan menggunakan tanpa biaya lisensi | Membutuhkan pengetahuan teknis (Node.js, PostgreSQL) untuk setup, tidak bisa langsung dipakai oleh non-developer |
+| **Keamanan Data** | Data tersimpan di database sendiri (self-hosted) — privasi terjaga dan tidak bergantung pada pihak ketiga | Tanggung jawab keamanan sepenuhnya di tangan pengguna (harus update, backup, dan konfigurasi sendiri) |
+| **Dunia Kerja** | Melatih disiplin deadline, prioritas tugas, dan manajemen waktu — skill yang langsung relevan di dunia profesional | Belum ada fitur kolaborasi tim, hanya untuk use-case personal/single user |
+| **Ekonomi Digital** | Mendorong adopsi teknologi digital dalam kehidupan sehari-hari dengan biaya nol | Belum terintegrasi dengan ekosistem produktivitas lain (Google Calendar, Slack, Notion, dll) |
+
+---
+
 ## Kelebihan (Positif)
 
 | Aspek | Kelebihan |
@@ -46,20 +59,20 @@ Aplikasi ini dikembangkan sebagai **proyek pembelajaran dan portofolio** untuk m
 
 ## Kekurangan (Negatif)
 
-| Aspek | Kekurangan | Rencana Perbaikan |
-|-------|------------|-------------------|
-| **Frontend** | Belum memiliki frontend (React/Vue) — hanya REST API | Prioritas 1: Bangun frontend agar aplikasi usable |
-| **Token Blacklist** | Menggunakan in-memory `Set` — hilang saat server restart | Prioritas 3: Migrasi ke Redis agar persist |
-| **Refresh Token** | Hanya access token tanpa refresh token — user harus login ulang setiap token expired | Prioritas 2: Implementasi refresh token (access 15 menit + refresh 7 hari) |
-| **Docker** | Belum ada Dockerfile / docker-compose | Prioritas 4: Dockerize dengan PostgreSQL + app |
-| **API Documentation** | Belum ada dokumentasi API interaktif (Swagger/OpenAPI) | Prioritas 5: Tambahkan Swagger/OpenAPI |
-| **Forgot Password** | Belum ada fitur reset password via email | Prioritas 6: Flow forgot/reset password dengan email |
-| **Task Categories** | Task belum bisa dikelompokkan (categories/tags) | Prioritas 7: Implementasi categories/tags |
-| **Real-time** | Belum ada notifikasi real-time (WebSocket) | Prioritas 8: Socket.io untuk deadline notification |
-| **CI/CD** | Belum ada automation testing & deployment | Prioritas 9: GitHub Actions auto test & deploy |
-| **File Upload** | Belum bisa attach file ke task | Prioritas 10: File upload dengan multer + cloud storage |
+| Aspek | Dampak Negatif untuk Masyarakat | Rencana Perbaikan |
+|-------|--------------------------------|-------------------|
+| **Frontend** | Tidak bisa dipakai masyarakat non-teknis — hanya developer yang bisa akses via API | Prioritas 1: Bangun frontend (React/Vue) agar accessible untuk semua |
+| **Kolaborasi Tim** | Hanya untuk personal — belum bisa kolaborasi antar user dalam satu project | Rencana: Shared workspace & team management |
+| **Integrasi Eksternal**| Tidak sinkron dengan Google Calendar, Slack, atau tools lain — terisolasi | Rencana: Integrasi API eksternal + export/import data |
+| **Notifikasi** | Tidak ada pengingat deadline — user harus selalu ngecek manual | Prioritas 8: WebSocket + email reminder |
+| **Setup Rumit** | Masyarakat awam tidak bisa install sendiri — perlu pengetahuan teknis | Prioritas 4: Docker + one-click deploy |
+| **Sesi Hilang** | Token blacklist in-memory — data login hilang saat server restart | Prioritas 3: Redis agar persist |
+| **Recovery Akun** | Tidak ada forgot password — user yang lupa password tidak bisa login | Prioritas 6: Reset password via email |
+| **Skalabilitas** | Belum ada caching / load balancing — performa turun jika banyak user | Rencana: Redis caching + query optimization |
+| **Mobile** | Belum ada mobile app / PWA — hanya via browser | Rencana: PWA atau React Native |
+| **Dokumentasi**| Developer lain kesulitan mempelajari API tanpa dokumentasi interaktif | Prioritas 5: Swagger/OpenAPI |
 
-> ℹ️  Daftar prioritas pengembangan selengkapnya ada di [`dokumentasi.md`](./dokumentasi.md).
+> ℹ️  Detail prioritas pengembangan ada di [`dokumentasi.md`](./dokumentasi.md).
 
 ---
 
