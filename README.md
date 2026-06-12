@@ -12,6 +12,57 @@
 
 Task Manager API adalah backend RESTful API untuk aplikasi manajemen task (todo list) dengan sistem authentication dan authorization berbasis role (User & Admin). Dibangun menggunakan **Node.js, Express, dan PostgreSQL** dengan arsitektur MVC, custom error handling, input validation, dan comprehensive testing.
 
+---
+
+## Mengapa Aplikasi Ini Dikembangkan?
+
+Aplikasi ini dikembangkan sebagai **proyek pembelajaran dan portofolio** untuk menguasai pengembangan backend RESTful API yang _production-ready_ menggunakan Node.js, Express, dan PostgreSQL. Tujuan utamanya:
+
+| Tujuan | Detail |
+|--------|--------|
+| 🎯 **Penguasaan Arsitektur MVC** | Memisahkan concern antara Routes, Controllers, Services, dan Models agar kode terstruktur, testable, dan mudah dipelihara |
+| 🛡️ **Implementasi Keamanan API** | Menerapkan JWT authentication, role-based authorization, rate limiting, input sanitization, helmet, CORS, dan error handling yang konsisten |
+| 🧪 **Testing & Quality Assurance** | Menulis comprehensive test (integration + unit) menggunakan Jest & Supertest untuk memastikan reliability |
+| 🗄️ **Database Design & Optimization** | Merancang skema PostgreSQL dengan indexing, constraint, trigger, dan parameterized query untuk performa & keamanan |
+| 🔄 **Soft Delete & Data Lifecycle** | Mengimplementasikan soft delete dengan expiry otomatis (30 hari) dan restore mechanism |
+| 🔧 **Error Handling & Logging** | Custom error class, global error handler (production mode menyembunyikan stack trace), dan request logging dengan Request ID |
+
+---
+
+## Kelebihan (Positif)
+
+| Aspek | Kelebihan |
+|-------|-----------|
+| **Arsitektur** | MVC clean architecture dengan pemisahan Routes → Controllers → Services → Models yang jelas, memudahkan scaling & maintenance |
+| **Keamanan** | Multi-layer security: Helmet, CORS, JWT auth, role-based access, rate limiting (login 5x/15menit, register 5x/jam, API 100x/menit), input sanitization, parameterized query (anti SQL injection) |
+| **Soft Delete** | Implementasi soft delete lengkap dengan expiry 30 hari dan restore mechanism untuk user & task, mencegah kehilangan data permanen |
+| **Deadline Management** | Fitur deadline task dengan filter hari ini & upcoming, validasi deadline tidak boleh kurang dari hari ini |
+| **Error Handling** | Custom AppError class + global error handler + ValidationError, response error konsisten sepanjang aplikasi |
+| **Testing** | 14 file test (integration + unit) dengan Jest + Supertest, mencakup auth, task, admin, middleware, utils, validators |
+| **Logging & Monitoring** | Request logging dengan UUID (X-Request-ID), health check endpoint dengan info DB status, uptime, memory |
+| **Graceful Shutdown** | Menangani SIGINT/SIGTERM dengan rapi — tutup koneksi database sebelum server mati |
+| **Rate Limiting** | 4 tier rate limiter berbeda untuk login, register, API umum, dan admin — mencegah brute force & abuse |
+| **Pagination & Filtering** | Pagination, search by title, filter by status, sorting multi-column pada task dan users |
+
+## Kekurangan (Negatif)
+
+| Aspek | Kekurangan | Rencana Perbaikan |
+|-------|------------|-------------------|
+| **Frontend** | Belum memiliki frontend (React/Vue) — hanya REST API | Prioritas 1: Bangun frontend agar aplikasi usable |
+| **Token Blacklist** | Menggunakan in-memory `Set` — hilang saat server restart | Prioritas 3: Migrasi ke Redis agar persist |
+| **Refresh Token** | Hanya access token tanpa refresh token — user harus login ulang setiap token expired | Prioritas 2: Implementasi refresh token (access 15 menit + refresh 7 hari) |
+| **Docker** | Belum ada Dockerfile / docker-compose | Prioritas 4: Dockerize dengan PostgreSQL + app |
+| **API Documentation** | Belum ada dokumentasi API interaktif (Swagger/OpenAPI) | Prioritas 5: Tambahkan Swagger/OpenAPI |
+| **Forgot Password** | Belum ada fitur reset password via email | Prioritas 6: Flow forgot/reset password dengan email |
+| **Task Categories** | Task belum bisa dikelompokkan (categories/tags) | Prioritas 7: Implementasi categories/tags |
+| **Real-time** | Belum ada notifikasi real-time (WebSocket) | Prioritas 8: Socket.io untuk deadline notification |
+| **CI/CD** | Belum ada automation testing & deployment | Prioritas 9: GitHub Actions auto test & deploy |
+| **File Upload** | Belum bisa attach file ke task | Prioritas 10: File upload dengan multer + cloud storage |
+
+> ℹ️  Daftar prioritas pengembangan selengkapnya ada di [`dokumentasi.md`](./dokumentasi.md).
+
+---
+
 ## Fitur Lengkap
 
 ### Authentication & Authorization
